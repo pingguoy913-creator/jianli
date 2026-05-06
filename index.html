@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 简历优化器 — 智能诊断 & 一键优化</title>
+<script src="https://unpkg.com/docx@8.5.0/build/index.min.js"></script>
+<script src="https://unpkg.com/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  background: #f5f6f8;
+  color: #222;
+  line-height: 1.6;
+}
+
+/* ===== 顶部横幅广告位 728×90 ===== */
+/* 百度联盟代码贴这里 */
+.ad-banner {
+  width: 100%;
+  max-width: 728px;
+  height: 90px;
+  margin: 0 auto 16px;
+  background: #fafafa;
+  border: 1px dashed #ccc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #999;
+  font-size: 13px;
+  border-radius: 4px;
+}
+
+header {
+  text-align: center;
+  padding: 32px 16px 8px;
+}
+header h1 {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  margin-bottom: 6px;
+}
+header p {
+  color: #666;
+  font-size: 14px;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.main-layout {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+/* ---- 左栏：输入 ---- */
+.panel {
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.06);
+  padding: 24px;
+}
+.panel-left {
+  flex: 1 1 45%;
+  min-width: 0;
+}
+.panel-right {
+  flex: 1 1 55%;
+  min-width: 0;
+  min-height: 400px;
+}
+
+.panel h2 {
+  font-size: 18px;
+  margin-bottom: 16px;
+  font-weight: 600;
+}
+
+.form-group {
+  margin-bottom: 16px;
+}
+.form-group label {
+  display: block;
+  font-weight: 500;
+  margin-bottom: 6px;
+  font-size: 14px;
+}
+.form-group select,
+.form-group textarea {
+  width: 100%;
+  border: 1px solid #d0d5dd;
+  border-radius: 6px;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color .2s;
+}
+.form-group select:focus,
+.form-group textarea:focus {
+  border-color: #4f46e5;
+  box-shadow: 0 0 0 3px rgba(79,70,229,.12);
+}
+.form-group textarea {
+  resize: vertical;
+  min-height: 220px;
+}
+
+.btn-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: all .2s;
+  white-space: nowrap;
+}
+.btn-primary {
+  background: #4f46e5;
+  color: #fff;
+}
+.btn-primary:hover { background: #4338ca; }
+.btn-primary:disabled { background: #a5b4fc; cursor: not-allowed; }
+
+.btn-outline {
+  background: #fff;
+  color: #4f46e5;
+  border: 1px solid #4f46e5;
+}
+.btn-outline:hover { background: #eef2ff; }
+.btn-outline:disabled { color: #a5b4fc; border-color: #c7d2fe; cursor: not-allowed; }
+
+/* ---- 右栏：结果 ---- */
+.result-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 320px;
+  color: #aaa;
+  text-align: center;
+  font-size: 14px;
+}
+.result-placeholder svg { margin-bottom: 12px; opacity: .4; }
+
+.result-content { animation: fadeIn .35s ease; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+.score-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+  padding: 16px;
+  background: #f8fafc;
+  border-radius: 8px;
+}
+.score-circle {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: conic-gradient(#4f46e5 calc(var(--score) * 1%), #e5e7eb 0);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.score-inner {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  font-weight: 700;
+  color: #4f46e5;
+}
+.score-text { font-size: 14px; color: #555; }
+.score-text strong { color: #4f46e5; }
+
+.section-box {
+  margin-bottom: 18px;
+}
+.section-box h3 {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.section-box ul { padding-left: 18px; }
+.section-box li { font-size: 14px; color: #444; margin-bottom: 4px; line-height: 1.7; }
+
+.tag {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 100px;
+  font-size: 12px;
+  font-weight: 500;
+  margin: 2px 4px 2px 0;
+}
+.tag-green { background: #dcfce7; color: #166534; }
+.tag-blue  { background: #dbeafe; color: #1e40af; }
+
+/* spinner */
+.spinner {
+  display: inline-block;
+  width: 18px; height: 18px;
+  border: 2px solid #c7d2fe;
+  border-top-color: #4f46e5;
+  border-radius: 50%;
+  animation: spin .6s linear infinite;
+  vertical-align: middle;
+  margin-right: 6px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Markdown 渲染样式 */
+.resume-preview h1, .resume-preview h2, .resume-preview h3, .resume-preview h4 {
+  margin: 16px 0 8px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.resume-preview h1 { font-size: 20px; border-bottom: 2px solid #e5e7eb; padding-bottom: 8px; }
+.resume-preview h2 { font-size: 18px; }
+.resume-preview h3 { font-size: 16px; color: #4f46e5; }
+.resume-preview h4 { font-size: 15px; }
+.resume-preview strong { font-weight: 600; color: #111; }
+.resume-preview hr { border: none; border-top: 1px solid #e5e7eb; margin: 16px 0; }
+.resume-preview ul, .resume-preview ol { padding-left: 20px; margin: 8px 0; }
+.resume-preview li { margin-bottom: 4px; }
+.resume-preview p { margin: 6px 0; }
+.resume-preview code { background: #f1f5f9; padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+.resume-preview blockquote {
+  border-left: 3px solid #4f46e5;
+  padding-left: 12px;
+  color: #555;
+  margin: 10px 0;
+}
+
+.error-msg {
+  background: #fef2f2;
+  color: #b91c1c;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  margin-bottom: 16px;
+  border: 1px solid #fecaca;
+}
+
+/* ---- 底部广告 ---- */
+.ad-bottom-row {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  margin-top: 32px;
+  flex-wrap: wrap;
+}
+.ad-box {
+  width: 300px;
+  height: 250px;
+  background: #fafafa;
+  border: 1px dashed #ccc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #999;
+  font-size: 13px;
+  border-radius: 4px;
+}
+
+footer {
+  text-align: center;
+  padding: 24px 16px 32px;
+  color: #999;
+  font-size: 12px;
+}
+
+/* ---- 移动端 ---- */
+@media (max-width: 768px) {
+  .main-layout { flex-direction: column; }
+  .panel-left, .panel-right { flex: 1 1 auto; width: 100%; }
+  header h1 { font-size: 22px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ===== 顶部横幅广告位 728×90 ===== -->
+<!-- 百度联盟代码贴这里 -->
+<div class="ad-banner">广告位 728×90 — 百度联盟代码贴这里</div>
+
+<header>
+  <h1>AI 简历优化器</h1>
+  <p>DeepSeek 智能诊断 · 逐条建议 · 一键生成专业简历</p>
+</header>
+
+<div class="container">
+  <div class="main-layout">
+
+    <!-- ===== 左栏：输入区 ===== -->
+    <div class="panel panel-left">
+      <h2>📋 简历输入</h2>
+
+      <div class="form-group">
+        <label for="direction">目标岗位方向</label>
+        <select id="direction">
+          <option value="互联网/技术">互联网/技术</option>
+          <option value="产品/运营">产品/运营</option>
+          <option value="市场/销售">市场/销售</option>
+          <option value="财务/会计">财务/会计</option>
+          <option value="教育/培训">教育/培训</option>
+          <option value="行政/人事">行政/人事</option>
+          <option value="设计/创意">设计/创意</option>
+          <option value="其他">其他</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="resumeText">粘贴简历文字内容</label>
+        <textarea id="resumeText" placeholder="请将您的简历文字内容粘贴到这里……&#10;&#10;示例：&#10;张三 | 3年Java开发经验 | 189xxxx&#10;教育背景：XX大学 计算机科学 本科 2019-2023&#10;工作经历：&#10;2023.07-至今 XX科技有限公司 Java开发工程师&#10;- 负责XX系统后端开发……"></textarea>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" id="btnDiagnose" onclick="handleDiagnose()">
+          🔍 AI 诊断优化
+        </button>
+        <button class="btn btn-outline" id="btnGenerate" onclick="handleGenerate()">
+          ✨ 生成优化简历
+        </button>
+      </div>
+    </div>
+
+    <!-- ===== 右栏：结果区 ===== -->
+    <div class="panel panel-right" id="resultPanel">
+      <div class="result-placeholder" id="resultPlaceholder">
+        <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/>
+          <line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
+        </svg>
+        <span>点击「AI 诊断优化」查看分析结果</span>
+      </div>
+      <div class="result-content" id="resultContent" style="display:none;"></div>
+    </div>
+
+  </div>
+
+  <!-- ===== 底部两个方块广告位 300×250 ===== -->
+  <!-- 百度联盟代码贴这里 -->
+  <div class="ad-bottom-row">
+    <div class="ad-box">广告位 300×250 — 百度联盟代码贴这里</div>
+    <div class="ad-box">广告位 300×250 — 百度联盟代码贴这里</div>
+  </div>
+</div>
+
+<footer>
+  AI 简历优化器 · 基于 DeepSeek 大模型 · 数据仅用于本次分析，不会存储
+</footer>
+
+<script>
+const DEEPSEEK_API = 'https://api.deepseek.com/v1/chat/completions';
+const API_KEY = 'sk-e87e89e470764e3b8aeeb5dc32d2c676';
+const MODEL = 'deepseek-v4-pro';
+
+let lastDiagnoseResult = null; // 缓存诊断结果
+
+async function callDeepSeek(messages, stream = false) {
+  const res = await fetch(DEEPSEEK_API, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${API_KEY}`
+    },
+    body: JSON.stringify({
+      model: MODEL,
+      messages,
+      temperature: 0.7,
+      max_tokens: 4096,
+      stream
+    })
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || `请求失败 (HTTP ${res.status})`);
+  }
+
+  const data = await res.json();
+  return data.choices[0].message.content;
+}
+
+function setLoading(btn, loading) {
+  if (loading) {
+    btn.disabled = true;
+    btn._origHTML = btn.innerHTML;
+    btn.innerHTML = '<span class="spinner"></span>分析中…';
+  } else {
+    btn.disabled = false;
+    btn.innerHTML = btn._origHTML;
+  }
+}
+
+function showError(msg) {
+  const panel = document.getElementById('resultContent');
+  panel.style.display = 'block';
+  document.getElementById('resultPlaceholder').style.display = 'none';
+  panel.innerHTML = `<div class="error-msg">⚠️ ${escapeHtml(msg)}</div>`;
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function getDiagnosePrompt(direction, resumeText) {
+  return `你是一位资深HR和职业规划专家。请对以下简历进行专业诊断分析。
+
+目标岗位方向：${direction}
+
+简历内容：
+${resumeText}
+
+请严格按以下JSON格式返回（不要返回其他内容，只返回JSON）：
+{
+  "score": 数字(0-100),
+  "issues": ["核心问题1", "核心问题2", …],
+  "suggestions": ["优化建议1", "优化建议2", …],
+  "highlights": ["亮点1", "亮点2", …],
+  "summary": "一句话总结"
+}
+
+要求：
+- score 要客观、有区分度，不要都打80以上
+- issues 至少2条，指出简历中的真实缺陷
+- suggestions 至少3条，每条具体可执行、有针对性
+- highlights 指出简历中的优势，至少1条
+- summary 精炼有力，不超过30个字`;
+}
+
+function getGeneratePrompt(direction, resumeText, diagnoseResult) {
+  let contextInfo = '';
+  if (diagnoseResult) {
+    contextInfo = `\n\n参考诊断信息：\n- 综合评分：${diagnoseResult.score}/100\n- 核心问题：${diagnoseResult.issues.join('；')}\n- 优化建议：${diagnoseResult.suggestions.join('；')}`;
+  }
+
+  return `你是一位资深简历撰写专家。请根据以下信息，重新撰写一份专业简历。
+
+目标岗位方向：${direction}
+原始简历：
+${resumeText}${contextInfo}
+
+要求：
+1. 格式专业规范，结构清晰，包含：个人信息（用占位符）、求职意向、教育背景、工作/项目经历、技能特长、自我评价
+2. 每条工作/项目经历必须包含可量化的数据（如提升XX%、管理XX人团队、节省XX成本、获得XX结果等）
+3. 使用 STAR 法则（情境-任务-行动-结果）描述经历
+4. 语言精炼专业，不啰嗦
+5. 突出与目标岗位方向匹配的能力和经验
+6. 直接输出完整简历文本，不需要解释`;
+}
+
+function renderDiagnoseResult(data) {
+  let html = '';
+
+  // 评分
+  html += `<div class="score-bar">
+    <div class="score-circle" style="--score:${data.score}">
+      <div class="score-inner">${data.score}</div>
+    </div>
+    <div class="score-text">
+      <strong>综合评分</strong><br>
+      ${data.score >= 80 ? '整体优秀，细节可再打磨' : data.score >= 60 ? '中规中矩，有较大优化空间' : '需要重点优化，建议按建议逐一修改'}
+    </div>
+  </div>`;
+
+  // 一句话总结
+  html += `<div class="section-box">
+    <h3>💬 一句话总结</h3>
+    <p style="font-size:15px;color:#333;font-weight:500;">${escapeHtml(data.summary)}</p>
+  </div>`;
+
+  // 核心问题
+  html += `<div class="section-box">
+    <h3>🔴 核心问题诊断</h3><ul>`;
+  data.issues.forEach(i => { html += `<li>${escapeHtml(i)}</li>`; });
+  html += `</ul></div>`;
+
+  // 优化建议
+  html += `<div class="section-box">
+    <h3>🟢 逐条优化建议</h3><ul>`;
+  data.suggestions.forEach(s => { html += `<li>${escapeHtml(s)}</li>`; });
+  html += `</ul></div>`;
+
+  // 亮点
+  html += `<div class="section-box">
+    <h3>⭐ 亮点提炼</h3>`;
+  data.highlights.forEach(h => { html += `<span class="tag tag-green">${escapeHtml(h)}</span>`; });
+  html += `</div>`;
+
+  // 导出按钮
+  html += `<div style="margin-top:20px;">
+    <button class="btn btn-outline" onclick="exportDiagnoseToWord()">📥 导出诊断报告 (Word)</button>
+  </div>`;
+
+  return html;
+}
+
+function renderGeneratedResume(text) {
+  const renderedMarkdown = marked.parse(text);
+  let html = `<div class="section-box">
+    <h3>✨ 优化后的完整简历</h3>
+    <div class="resume-preview" style="background:#f9fafb;border-radius:8px;padding:20px;font-size:14px;line-height:1.8;font-family:inherit;">${renderedMarkdown}</div>
+  </div>
+  <div style="display:flex;gap:12px;flex-wrap:wrap;">
+    <button class="btn btn-outline" onclick="exportResumeToWord()">📥 导出为 Word 文档</button>
+    <button class="btn btn-outline" onclick="copyResumeText()">📋 复制简历文本</button>
+  </div>`;
+  return html;
+}
+
+// ===== 按钮处理 =====
+
+async function handleDiagnose() {
+  const direction = document.getElementById('direction').value;
+  const resumeText = document.getElementById('resumeText').value.trim();
+
+  if (!resumeText) {
+    alert('请先粘贴简历文字内容');
+    return;
+  }
+  if (resumeText.length < 30) {
+    alert('简历内容太短，请至少输入30个字');
+    return;
+  }
+
+  const btn = document.getElementById('btnDiagnose');
+  setLoading(btn, true);
+
+  try {
+    const prompt = getDiagnosePrompt(direction, resumeText);
+    const content = await callDeepSeek([
+      { role: 'system', content: '你是一个专业的简历诊断助手，只返回JSON格式数据，不要添加任何解释。' },
+      { role: 'user', content: prompt }
+    ]);
+
+    // 解析 JSON
+    let data;
+    try {
+      // 尝试提取 JSON（有时模型会包裹在 ```json 中）
+      const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, content];
+      data = JSON.parse(jsonMatch[1].trim());
+    } catch {
+      throw new Error('AI 返回格式异常，请重试');
+    }
+
+    // 校验必要字段
+    if (typeof data.score !== 'number' || !Array.isArray(data.issues) || !Array.isArray(data.suggestions) || !Array.isArray(data.highlights) || !data.summary) {
+      throw new Error('AI 返回数据不完整，请重试');
+    }
+
+    lastDiagnoseResult = data;
+
+    const panel = document.getElementById('resultContent');
+    panel.innerHTML = renderDiagnoseResult(data);
+    panel.style.display = 'block';
+    document.getElementById('resultPlaceholder').style.display = 'none';
+
+  } catch (err) {
+    showError(err.message);
+    lastDiagnoseResult = null;
+  } finally {
+    setLoading(btn, false);
+  }
+}
+
+async function handleGenerate() {
+  const direction = document.getElementById('direction').value;
+  const resumeText = document.getElementById('resumeText').value.trim();
+
+  if (!resumeText) {
+    alert('请先粘贴简历文字内容');
+    return;
+  }
+  if (resumeText.length < 30) {
+    alert('简历内容太短，请至少输入30个字');
+    return;
+  }
+
+  const btn = document.getElementById('btnGenerate');
+  setLoading(btn, true);
+
+  try {
+    const prompt = getGeneratePrompt(direction, resumeText, lastDiagnoseResult);
+    const content = await callDeepSeek([
+      { role: 'system', content: '你是一个专业的简历撰写专家，直接输出优化后的完整简历文本，不要添加任何解释或前缀。' },
+      { role: 'user', content: prompt }
+    ]);
+
+    // 存储生成结果到全局变量供导出使用
+    window._generatedResume = content;
+
+    const panel = document.getElementById('resultContent');
+    panel.innerHTML = renderGeneratedResume(content);
+    panel.style.display = 'block';
+    document.getElementById('resultPlaceholder').style.display = 'none';
+
+  } catch (err) {
+    showError(err.message);
+  } finally {
+    setLoading(btn, false);
+  }
+}
+
+// ===== Word 导出 =====
+
+function buildDiagnoseDocData() {
+  const d = lastDiagnoseResult;
+  if (!d) return null;
+
+  const { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, WidthType, AlignmentType, BorderStyle, convertInchesToTwip } = docx;
+
+  const children = [];
+
+  children.push(new Paragraph({
+    text: 'AI 简历诊断报告',
+    heading: HeadingLevel.HEADING_1,
+    alignment: AlignmentType.CENTER,
+    spacing: { after: 300 }
+  }));
+
+  children.push(new Paragraph({
+    text: `生成时间：${new Date().toLocaleString('zh-CN')}`,
+    alignment: AlignmentType.CENTER,
+    spacing: { after: 400 },
+    style: 'small'
+  }));
+
+  children.push(new Paragraph({
+    text: `综合评分：${d.score}/100`,
+    heading: HeadingLevel.HEADING_2,
+    spacing: { after: 200 }
+  }));
+
+  children.push(new Paragraph({ text: d.summary, spacing: { after: 300 }, style: 'strong' }));
+
+  children.push(new Paragraph({ text: '核心问题诊断', heading: HeadingLevel.HEADING_2, spacing: { before: 200, after: 100 } }));
+  d.issues.forEach(i => {
+    children.push(new Paragraph({ text: `• ${i}`, spacing: { after: 60 }, bullet: { level: 0 } }));
+  });
+
+  children.push(new Paragraph({ text: '逐条优化建议', heading: HeadingLevel.HEADING_2, spacing: { before: 200, after: 100 } }));
+  d.suggestions.forEach((s, idx) => {
+    children.push(new Paragraph({ text: `${idx + 1}. ${s}`, spacing: { after: 60 } }));
+  });
+
+  children.push(new Paragraph({ text: '亮点提炼', heading: HeadingLevel.HEADING_2, spacing: { before: 200, after: 100 } }));
+  children.push(new Paragraph({ text: d.highlights.join('；'), spacing: { after: 200 } }));
+
+  return children;
+}
+
+async function exportDiagnoseToWord() {
+  if (!lastDiagnoseResult) return;
+  const children = buildDiagnoseDocData();
+  if (!children) return;
+
+  const { Document, Packer } = docx;
+  const doc = new Document({
+    sections: [{
+      properties: {},
+      children
+    }]
+  });
+
+  const blob = await Packer.toBlob(doc);
+  saveAs(blob, `简历诊断报告_${Date.now()}.docx`);
+}
+
+async function exportResumeToWord() {
+  const text = window._generatedResume;
+  if (!text) {
+    alert('请先生成优化简历');
+    return;
+  }
+
+  const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } = docx;
+
+  const lines = text.split('\n');
+  const children = lines.map(line => {
+    const trimmed = line.trim();
+    if (!trimmed) return new Paragraph({ text: '', spacing: { after: 80 } });
+    if (trimmed.length <= 20 && (trimmed.includes('：') || trimmed.includes(':') || trimmed.endsWith('：') || trimmed.endsWith(':'))) {
+      return new Paragraph({ text: trimmed, heading: HeadingLevel.HEADING_3, spacing: { before: 120, after: 60 } });
+    }
+    return new Paragraph({ text: trimmed, spacing: { after: 60 } });
+  });
+
+  const doc = new Document({
+    sections: [{
+      properties: {},
+      children
+    }]
+  });
+
+  const blob = await Packer.toBlob(doc);
+  saveAs(blob, `优化简历_${Date.now()}.docx`);
+}
+
+function copyResumeText() {
+  const text = window._generatedResume;
+  if (!text) { alert('请先生成优化简历'); return; }
+  navigator.clipboard.writeText(text).then(() => {
+    alert('已复制到剪贴板');
+  }).catch(() => {
+    alert('复制失败，请手动复制');
+  });
+}
+</script>
+
+</body>
+</html>
